@@ -10,42 +10,97 @@ import datetime
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 from xmlrpclib import Binary
 import sys, pickle, xmlrpclib
-import signal
 
-from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
-
-from ft_layer import *
 
 
 count = 0
 
-
+from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 
 if not hasattr(__builtins__, 'bytes'):
     bytes = str
+	
+class ReliableLayer:
+    def __init__(self,urls):
+        self.urls = urls
+        
+        self.meta_url = urls[0]
+        
+        self.data_urls = urls[1:]
+        print "META server obj: ", self.meta_url
+        self.meta_hdl = xmlrpclib.Server(self.meta_url)
+        self.data_hdls = []
+        print "DATA servers objs: ", self.data_urls
+        for url in self.data_urls:
+            print "DATA server obj: ", url 
+            self.data_hdls.append(xmlrpclib.Server(url))
+
+
+    def reliable_put(self,path,key,value):
+        
+        if key == "meta":
+            key = path +"&&meta"
+            self.meta_hdl.put(Binary(key),Binary(pickle.dumps(value)),6000)
+        else:
+            key = path + "&&" + key
+            for dh in self.data_hdls:
+                dh.put(Binary(key),Binary(pickle.dumps(value)),6000)
+
+
+
+    def reliable_get(self,path,key):    
+        if key == "meta":
+            key = path+"&&"+key
+            res = self.meta_hdl.get(Binary(key))
+            print "GoT() -> ",key,"data: ", res
+            if "value" in res:
+                return pickle.loads(res["value"].data)
+            else:
+                return None
+
+        else:
+            key = path+"&&"+key
+            res = self.data_hdls[0].get(Binary(key))
+            print "SERVER GET(): ",res
+            rdata = []
+            for dh in self.data_hdls:
+            	rdata.append(dh.get(Binary(key)))
+            #write function to check if 
+            # any  data is corrupted or if the servers terminated
+            print "2"
+            if "value" in res:
+                print "3"
+                unpickled_value = pickle.loads(res["value"].data)
+                print "unpickled_value: ",unpickled_value
+                return unpickled_value
+            else:
+                print "4"
+                return None
 
 
 class FileNode:
-    def __init__(self,name,isFile,path,urls):
+    def __init__(self,name,isFile,path,url):
         self.name = name
         self.path = path
-        self.urls = urls
+        self.url = url
         self.isFile = isFile # true if node is a file, false if is a directory.
-
-        if self.get("meta") == None:
-            self.put("data","") # used if it is a file
-            self.put("meta",{})
-            self.put("list_nodes",{})# contains a tuple of <name:FileNode>  used only if it is a dir. 
+        self.put("data","") # used if it is a file
+        self.put("meta",{})
+        self.put("list_nodes",{})# contains a tuple of <name:FileNode>  used only if it is a dir. 
 
     def put(self,key,value):
-        # Call reliable put
-        ft_obj= ReliableLayer(self.urls)
-        ft_obj.reliable_put(self.path,key,value)
+        key = self.path+"&&"+key
+        rpc = xmlrpclib.Server(url)
+        rpc.put(Binary(key), Binary(pickle.dumps(value)), 6000)
 
     def get(self,key):
-        # Call realiable get
-        ft_obj= ReliableLayer(self.urls)
-        return ft_obj.reliable_get(self.path,key)
+        key = self.path+"&&"+key
+        rpc = xmlrpclib.Server(url)
+        res = rpc.get(Binary(key))
+        if "value" in res:
+            return pickle.loads(res["value"].data)
+        else:
+            return None
     
     def set_data(self,data_blob):
         self.put("data",data_blob)
@@ -61,8 +116,8 @@ class FileNode:
         return self.get("meta")
 
     def list_nodes(self):
-        values = self.get("list_nodes").values()
-        return values
+        print "LIST NODES VALUES: ", self.get("list_nodes").values()
+        return self.get("list_nodes").values()
 
     def add_node(self,newnode):
         list_nodes = self.get("list_nodes")
@@ -70,10 +125,10 @@ class FileNode:
         self.put("list_nodes",list_nodes)
 
     def contains_node(self,name): # returns node object if it exists
-        
         if (self.isFile==True):
             return None
         else:
+            print "LIST NODES KEYS: ", self.get("list_nodes").keys()
             if name in self.get("list_nodes").keys():
                 return self.get("list_nodes")[name]
             else:
@@ -81,9 +136,9 @@ class FileNode:
 
 
 class FS:
-    def __init__(self,urls):
-        self.urls = urls
-        self.root = FileNode('/',False,'/',urls)
+    def __init__(self,url):
+        self.url = url
+        self.root = FileNode('/',False,'/',url)
         now = time()
         self.fd = 0
         self.root.set_meta(dict(st_mode=(S_IFDIR | 0755), st_ctime=now,st_mtime=now,\
@@ -125,7 +180,7 @@ class FS:
 
     def add_dir(self,path,mode):
         # create a file node
-        temp_node = FileNode(path.split('/')[-1],False,path,self.urls)
+        temp_node = FileNode(path.split('/')[-1],False,path,self.url)
         temp_node.set_meta(dict(st_mode=(S_IFDIR | mode), st_nlink=2,
                                 st_size=0, st_ctime=time(), st_mtime=time(),
                                 st_atime=time()))
@@ -135,7 +190,7 @@ class FS:
 
     def add_file(self,path,mode):
         # create a file node
-        temp_node = FileNode(path.split('/')[-1],True,path,self.urls)
+        temp_node = FileNode(path.split('/')[-1],True,path,self.url)
         temp_node.set_meta(dict(st_mode=(S_IFREG | mode), st_nlink=1,
         st_size=0, st_ctime=time(), st_mtime=time(),
         st_atime=time()))
@@ -222,7 +277,7 @@ class FS:
 
     def link_nodes(self,target,source):
         # create a new target node.
-        temp_node = FileNode(target.split('/')[-1],True,target,self.urls)
+        temp_node = FileNode(target.split('/')[-1],True,target,self.url)
         temp_node.set_meta(dict(st_mode=(S_IFLNK | 0777), st_nlink=1,
                                   st_size=len(source)))
         temp_node.set_data(source)
@@ -245,13 +300,13 @@ class FS:
 class Memory(LoggingMixIn, Operations):
     'Example memory filesystem. Supports only one level of files.'
 
-    def __init__(self,urls):
+    def __init__(self,url):
         global count # count is a global variable, can be used inside any function.
         count +=1 # increment count for very method call, to track count of calls made.
         print ("CallCount {} " " Time {}".format(count,datetime.datetime.now().time())) # print the parameters passed to the method as input.(used for debugging)
         print('In function __init__()') #print name of the method called
 
-        self.FS = FS(urls)
+        self.FS = FS(url)
        
         
        
@@ -404,15 +459,12 @@ class Memory(LoggingMixIn, Operations):
    
 if __name__ == "__main__":
   if len(argv) < 4:
-    print 'usage: %s <mountpoint>  <meta server hashtable> <data servers>' % argv[0]
+    print 'usage: %s <mountpoint> <meta server> <data_server_1> ..' % argv[0]
     exit(1)
-  urls = []
-  ports = [] 
   ports = argv[2:]
-  print "META SERVER: ", ports[0], "DATA SERVER: ", ports[1:]
+  url = []
   for port in ports:
-      url = "http://localhost:" + port
-      urls.append(url)
-  
-  # Create a new HtProxy object using the urls specified at the command-line
-  fuse = FUSE(Memory(urls), argv[1], foreground=True)
+      ur = "http://localhost:" + port
+      url.append(ur)
+  # Create a new HtProxy object using the URL specified at the command-line
+  fuse = FUSE(Memory(url), argv[1], foreground=True,debug=True)

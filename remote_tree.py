@@ -60,6 +60,7 @@ class FileNode:
         return self.get("meta")
 
     def list_nodes(self):
+        print "LIST NODES VALUES: ", self.get("list_nodes").values()
         return self.get("list_nodes").values()
 
     def add_node(self,newnode):
@@ -71,6 +72,7 @@ class FileNode:
         if (self.isFile==True):
             return None
         else:
+            print "LIST NODES KEYS: ", self.get("list_nodes").keys()
             if name in self.get("list_nodes").keys():
                 return self.get("list_nodes")[name]
             else:
@@ -405,4 +407,4 @@ if __name__ == "__main__":
     exit(1)
   url = argv[2]
   # Create a new HtProxy object using the URL specified at the command-line
-  fuse = FUSE(Memory(url), argv[1], foreground=True)
+  fuse = FUSE(Memory(url), argv[1], foreground=True,debug=True)

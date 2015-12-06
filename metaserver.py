@@ -30,14 +30,15 @@ from xmlrpclib import Binary
 from multiprocessing import Pool
 import signal
 
+quit = 0
 
 def init_worker():
   signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 # Presents a HT interface
-class SimpleHT:
+class SimpleHT():
   def __init__(self):
-    self.quit =0;
+    self.quit =  0
     self.data = {}
     self.next_check = datetime.now() + timedelta(minutes = 5)
 
@@ -105,13 +106,13 @@ class SimpleHT:
     for key in to_remove:
       del self.data[key]
 
-  def corrupt(self,):
+  def corrupt(self):
     return
 
   def terminate(self):
-    self.quit =1
+    # set self.quit to 1
+    self.quit = 1
     return True
-    
        
 
 def main():
@@ -119,14 +120,24 @@ def main():
   #server_handle = []
   #print optlist," ",args
   print sys.argv
-  if len(sys.argv) < 3:
-    print 'usage: %s <meta server port> <data servers ports>' % sys.argv[0]
+  if len(sys.argv) < 2:
+    print 'usage: %s <meta server port> ' % sys.argv[0]
     sys.exit(1)
-  ports = sys.argv[1:]
-  ports = map(int,ports)
-  spool = Pool(len(ports),init_worker)
-  
-  spool.map(serve,ports)
+  ports = sys.argv[1]
+  serve(int(ports))
+
+
+
+  '''
+  port = 51234
+  if "--port" in ol:
+    port = int(ol["--port"])  
+  if "--test" in ports:
+    sys.argv.remove("--test")
+    unittest.main()
+    return
+  #serve(port)
+  '''
 
 # Start the xmlrpc server
 def serve(port):
@@ -139,12 +150,19 @@ def serve(port):
   file_server.register_function(sht.print_content)
   file_server.register_function(sht.read_file)
   file_server.register_function(sht.write_file)
-  file_server.register_function(sht.terminate)
   file_server.register_function(sht.corrupt)
+  file_server.register_function(sht.terminate)
+
   print "SERVER is UP at port: ",port
   while not sht.quit:
+    try:
       file_server.handle_request()
+    except KeyboardInterrupt:
+      print "closing"
+      sht.quit =1
+      
   print "SERVER is DOWN at port: ",port
+
   
 
 # Execute the xmlrpc in a thread ... needed for testing

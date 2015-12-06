@@ -105,8 +105,15 @@ class SimpleHT:
     for key in to_remove:
       del self.data[key]
 
-  def corrupt(self,):
-    return
+  def corrupt(self,key):
+    # Remove expired entries
+    self.check()
+    ttl = 6000
+    end = datetime.now() + timedelta(seconds = ttl)
+    pickled_val = pickle.dumps("This file is corrupted")
+    value = Binary(pickled_val)
+    self.data[key.data] = (value.data, end)
+    return True
 
   def terminate(self):
     self.quit =1
@@ -144,6 +151,7 @@ def serve(port):
   print "SERVER is UP at port: ",port
   while not sht.quit:
       file_server.handle_request()
+  del file_server
   print "SERVER is DOWN at port: ",port
   
 
