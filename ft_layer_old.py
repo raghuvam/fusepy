@@ -4,7 +4,7 @@ from collections import defaultdict
 from errno import ENOENT
 from stat import S_IFDIR, S_IFLNK, S_IFREG
 from sys import argv, exit
-from time import time,sleep
+from time import time
 import datetime
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 from xmlrpclib import Binary
@@ -24,7 +24,7 @@ def put_fault_handler(fservers,path,key,value):
                 fservers.pop(count)
                 count = count -1
         except:
-            sleep(1)
+            time.sleep(1)
             continue
     print "PUT handler successful"
     return None
@@ -38,36 +38,46 @@ def update_checksum(meta_server,path,key,pickled_value):
 
 
 def validate_checksum(meta_server,data_servers,path,key,rdata):
-    fkey = path + key+"&&checksum"
-    key = path + "&&" + key
-    valid_checksum = meta_server.get(Binary(fkey))
-    print valid_checksum, path, fkey
-    valid_checksum = valid_checksum["value"].data
-    print valid_checksum
+	fkey = path + key+"&&checksum"
+	key = path + "&&" + key
+	valid_checksum = meta_server.get(Binary(fkey))
+	print valid_checksum, path, fkey
+	valid_checksum = valid_checksum["value"].data
+	print valid_checksum
 
-    # checks if any server has corrupted data
-    count = 0
-    isCorrupted  = False
-    print rdata
-    for ndat in rdata:
-        curr_checksum = hashlib.md5(ndat).hexdigest()
-        print "server ",count," ",curr_checksum
-        print "data ",pickle.dumps(ndat)
-        if valid_checksum != curr_checksum:
-            print "valid_checksum"
-            print "Data server",count," is corrupted"
-            failed_server_id = count
-            isCorrupted = True
-        if valid_checksum == curr_checksum:
-            print "date_server ", count," is good"
+	# checks if any server has corrupted data
+	count = 0
+	isCorrupted  = False
+	print rdata
+	for ndat in rdata:
+		curr_checksum = hashlib.md5(ndat).hexdigest()
+		print "server ",count," ",curr_checksum
+		print "data ",pickle.dumps(ndat)
+		if valid_checksum != curr_checksum:
+			print "valid_checksum"
+			print "Data server",count," is corrupted"
+			failed_server_id = count
+			isCorrupted = True
+		if valid_checksum == curr_checksum:
+			print "date_server ", count," is good"
             good_server_id = count
         count = count +1
-    # correct the corrupted         
+    # correct the corrupted        	
     if isCorrupted:
         dh = xmlrpclib.Server(data_servers[failed_server_id])
         dh.put(Binary(key),Binary(rdata[good_server_id]),6000)
-    
+	
     return  pickle.loads(rdata[good_server_id])
+
+        '''
+        print "Correcting corrupted data" 
+        print "good_server_id: ",good_server_id
+        print "failed_server_id: ",failed_server_id
+        print "good data: ",rdata[good_server_id]
+        print "unpickeld good data: ",pickle.loads(rdata[good_server_id])
+        print "bad data: ",rdata[failed_server_id]
+        '''
+
 
 class ReliableLayer:
     def __init__(self,urls):        
@@ -92,7 +102,8 @@ class ReliableLayer:
         if key == "meta" or key == "list_nodes":
             key = path +"&&" + key
             self.meta_hdl.put(Binary(key),Binary(pickled_value),6000)
-        else:           
+        else:
+            
             update_checksum(self.meta_hdl,path,key,pickled_value)
             count = 0
             #contains handlers for failed puts
@@ -110,7 +121,7 @@ class ReliableLayer:
                         isConnected = True
                     except:
                         #print "appending fault servers list"
-                        sleep(1)
+                        time.sleep(1)
                         print "Trying to reconnect to the server"
                         continue
             '''
@@ -155,18 +166,18 @@ class ReliableLayer:
                         isConnected = True
                     except:
                         #print "appending fault servers list"
-                        sleep(1)
+                        time.sleep(1)
                         print "Trying to reconnect to the server"
                         continue
             '''
             for dh in self.data_hdls:
-                res = dh.get(Binary(key))
-                # append to rdata
-                if "value" in res:
-                    rdata.append(res["value"].data)
+            	res = dh.get(Binary(key))
+            	# append to rdata
+            	if "value" in res:
+                	rdata.append(res["value"].data)
             '''
             if len(rdata) == 0:
-                return None
+            	return None
 
             # validate checksum
             result  =validate_checksum(self.meta_hdl,self.data_urls,path,tkey,rdata)

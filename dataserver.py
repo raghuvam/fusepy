@@ -151,6 +151,7 @@ def serve(port):
   print "SERVER is UP at port: ",port
   while not sht.quit:
       file_server.handle_request()
+  file_server.server_close()
   del file_server
   print "SERVER is DOWN at port: ",port
   
