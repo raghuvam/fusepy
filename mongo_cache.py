@@ -41,7 +41,7 @@ class lruCache:
     def get(self,key):
         ## get the f
         print "get from cache -- \n", key
-        print "CACHE CONTENTS\n",self.cache.keys()
+        #print "CACHE CONTENTS\n",self.cache.keys()
         try:
           value = self.cache.pop(key)
           self.cache[key] = value
@@ -52,7 +52,7 @@ class lruCache:
             return False
     
     def put(self, key, value):
-        print "put in cache -- \n", key
+        #print "put in cache -- \n", key
         #print "\n",self.cache
         try:
             #pop the old file with same key from cache
@@ -138,11 +138,11 @@ class FileNode:
         
         qkey = {"key":str(skey)}
         
-        print "root fs: ", fsys.find_one({"key":'/&&list_nodes'})
+        #print "root fs: ", fsys.find_one({"key":'/&&list_nodes'})
         
         # first try getting the file from cache
         cdict = lru_cache.get(skey)
-        print "cache get", cdict
+        #print "cache get", cdict
         
         # if the doc is present in the cache
         if cdict:
@@ -150,7 +150,7 @@ class FileNode:
                 
                 #print time taken for GET
                 stop = timeit.default_timer()
-                print "GET - RUNTIME--> ", (stop-start)*(1000000)," us"
+                print "CACHE GET - RUNTIME--> ", (stop-start)*(1000000)," us"
                 
                 return pickle.loads(cdict["value"])
             else:
