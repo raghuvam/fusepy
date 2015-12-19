@@ -83,11 +83,11 @@ class FileNode:
         self.meta_id = 0
         self.list_nodes_id = 0
         key = self.path+"&&"+"meta"
-        mongoc = MongoClient(url,27017)
-        db = mongoc.fsdb
-        fsys = db.fs_cache
+        self.mongoc = MongoClient(url,27017)
+        self.db = self.mongoc.fsdb
+        self.fsys = self.db.fs_cache
          # true if node is a file, false if is a directory.
-        if not bool(fsys.find_one({"key":key})): # checks if it is already on the server
+        if not bool(self.fsys.find_one({"key":key})): # checks if it is already on the server
           self.put("data","") # used if it is a file
           self.put("meta",{})
           self.put("list_nodes",{})# contains a tuple of <name:FileNode>  used only if it is a dir. 
@@ -100,9 +100,9 @@ class FileNode:
         skey = self.path+"&&"+key
         print "\n \n", skey
 
-        mongoc = MongoClient(url,27017)
-        db = mongoc.fsdb
-        fsys = db.fs_cache               
+        #self.mongoc = MongoClient(url,27017)
+        #self.db = self.mongoc.fsdb
+        #self.fsys = self.db.fs_cache               
         
         fdict = dict()
         # pickle the value of the the dictionary
@@ -114,7 +114,7 @@ class FileNode:
         
         #update the file in the server
         
-        fsys.update({"key":skey},{ "$set": { "value": pickle_value } },upsert =True)
+        self.fsys.update({"key":skey},{ "$set": { "value": pickle_value } },upsert =True)
         
         #print time taken for PUT
         stop = timeit.default_timer()
@@ -131,14 +131,14 @@ class FileNode:
         skey = self.path+"&&"+key
         print "\n \n", skey               
 
-        mongoc = MongoClient(url,27017)
-        db = mongoc.fsdb
-        fsys = db.fs_cache
+        #self.mongoc = MongoClient(url,27017)
+        #self.db = self.mongoc.fsdb
+        #self.fsys = self.db.fs_cache
         
         
         qkey = {"key":str(skey)}
         
-        print "root fs: ", fsys.find_one({"key":'/&&list_nodes'})
+        print "root fs: ", self.fsys.find_one({"key":'/&&list_nodes'})
         
         # first try getting the file from cache
         cdict = lru_cache.get(skey)
@@ -158,7 +158,7 @@ class FileNode:
         
         #else get from the db server    
         else:
-            fdict = fsys.find_one(qkey)
+            fdict = self.fsys.find_one(qkey)
             print fdict
             if "value" in fdict.keys():
                 
