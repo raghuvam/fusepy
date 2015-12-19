@@ -126,8 +126,8 @@ def main():
   #server_handle = []
   #print optlist," ",args
   print sys.argv
-  if len(sys.argv) < 3:
-    print 'usage: %s <meta server port> <data servers ports>' % sys.argv[0]
+  if len(sys.argv) < 2:
+    print 'usage: %s <data servers ports>' % sys.argv[0]
     sys.exit(1)
   ports = sys.argv[1:]
   ports = map(int,ports)

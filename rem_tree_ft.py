@@ -13,6 +13,9 @@ import signal
 
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 
+QR = 1
+QW = 1
+
 from ft_layer import *
 
 
@@ -38,12 +41,16 @@ class FileNode:
 
     def put(self,key,value):
         # Call reliable put
-        ft_obj= ReliableLayer(self.urls)
+        global QR
+        global QW
+        ft_obj= ReliableLayer(QR,QW,self.urls)
         ft_obj.reliable_put(self.path,key,value)
 
     def get(self,key):
         # Call realiable get
-        ft_obj= ReliableLayer(self.urls)
+        global QR
+        global QW
+        ft_obj= ReliableLayer(QR,QW,self.urls)
         return ft_obj.reliable_get(self.path,key)
     
     def set_data(self,data_blob):
@@ -394,24 +401,22 @@ class Memory(LoggingMixIn, Operations):
 
         self.FS.update_meta(path,uid=uid,gid=gid)
         
-        
-    
-        
-    
-        
 
-   
 if __name__ == "__main__":
-  if len(argv) < 4:
-    print 'usage: %s <mountpoint>  <meta server hashtable> <data servers>' % argv[0]
+  if len(argv) < 6:
+    print 'usage: %s <mountpoint> <QR> <QW> <meta server hashtable> <data servers>' % argv[0]
     exit(1)
+  global QR
+  global QW
+  QR = int(argv[2])
+  QW = int(argv[3])
   urls = []
   ports = [] 
-  ports = argv[2:]
+  ports = argv[4:]
   print "META SERVER: ", ports[0], "DATA SERVER: ", ports[1:]
   for port in ports:
       url = "http://localhost:" + port
       urls.append(url)
   
   # Create a new HtProxy object using the urls specified at the command-line
-  fuse = FUSE(Memory(urls), argv[1], foreground=True)
+  fuse = FUSE(Memory(urls), argv[1], foreground=True,debug=False)

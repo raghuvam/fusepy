@@ -4,7 +4,23 @@ import unittest
 import os
 import subprocess
 from subprocess import check_output
+from subprocess import Popen, PIPE
+from xmlrpclib import Binary
+import sys, pickle, xmlrpclib
+import signal
+import subprocess
+import threading
+#test 1
+#meta_ports="51234"
+#data_ports=["51235", "51236"]
+#mh = xmlrpclib.Server("http://localhost:51234")
+#durls = map(lambda(x):return "http://localhost:"+x,data_ports)
+#dh=map(xmlrpclib.Server,durls)
+#mh.terminate()
+#time.sleep(10)
 
+
+basepath = '/home/rv/junk/fusepy'
 
 '''
 Test-1
@@ -38,7 +54,9 @@ def readFile(filename):
     f.close()
     return ret_string
 
-basepath = '/home/rv/junk/pocsd/fusepy'
+def check_file(cmd):
+    os.system(cmd)
+
 
 class FileSystemTest(unittest.TestCase):
            
@@ -90,7 +108,26 @@ class FileSystemTest(unittest.TestCase):
         os.chdir("../..")
         contents = sorted(os.listdir("."))
         self.assertEqual(contents,sorted(['dir1', 'f11.txt']),"File renaming failed")
+    
+    def test_07_renameFile(self):
+        os.chdir(basepath)
+        os.chdir("fusemount")
         
+        writeIntoAFile("file1.txt","f21")
+        dh = xmlrpclib.Server("http://localhost:51235")
+        dh.terminate()
+        thread1 = threading.Thread(target=check_file,args=("cat /home/rv/junk/fusepy/fusemount/file1.txt",))
+        thread1.start() # This actually causes the thread to run
+        print "Waiting for thread to run"
+        time.sleep(10)
+        os.chdir("../")
+        subprocess.Popen("python dataserver.py 51235")
+        thread1.join()  # This waits until the thread has completed 
+        
+        
+        contents1 = sorted(os.listdir("."))
+        self.assertEqual(contents1,sorted(['file1.txt']),"Nested File creation failed")
+      
         
         
    
